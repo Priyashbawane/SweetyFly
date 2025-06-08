@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flappy Bird with Power-ups</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #222;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            overflow: hidden;
+            background-image: url('https://iili.io/F3kbmSn.jpg');
+            background-size: cover;
+            border: 3px solid #444;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        #bird {
+            position: absolute;
+            width: 50px;
+            height: 35px;
+            background-image: url('https://iili.io/F3kbbcX.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: 10;
+            transition: transform 0.1s;
+        }
+        
+        .pipe {
+            position: absolute;
+            width: 70px;
+            background-image: url('https://iili.io/F3kmy0P.png');
+            background-size: cover;
+            z-index: 5;
+        }
+        
+        #ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 30px;
+            background-color: #8B4513;
+            z-index: 7;
+            background-image: linear-gradient(to right, #8B4513, #A0522D, #8B4513);
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 28px;
+            color: white;
+            z-index: 20;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-weight: bold;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 30;
+            width: 70%;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+        
+        #restart-btn {
+            margin-top: 20px;
+            padding: 12px 25px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        #restart-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .bottle {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background-image: url('https://iili.io/F3v7uyX.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: 8;
+        }
+        
+        #power-up-timer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: gold;
+            z-index: 20;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            display: none;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            font-size: 16px;
+            color: white;
+            z-index: 20;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        
+        #credits {
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+            font-size: 12px;
+            color: white;
+            z-index: 20;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="bird"></div>
+        <div id="ground"></div>
+        <div id="score">0</div>
+        <div id="power-up-timer"></div>
+        <div id="instructions">Space/Click to jump</div>
+        <div id="credits">Game Developed By PRIYASH & UTKARSH</div>
+        <div id="game-over">
+            <h2>Game Over!</h2>
+            <p>Your score: <span id="final-score">0</span></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const bird = document.getElementById('bird');
+        const gameContainer = document.getElementById('game-container');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+        const powerUpTimer = document.getElementById('power-up-timer');
+        
+        let birdY = 300;
+        let birdVelocity = 0;
+        let gravity = 0.5;
+        let jumpForce = -10;
+        let gameRunning = true;
+        let score = 0;
+        let pipes = [];
+        let pipeGap = 150;
+        let pipeFrequency = 1800; // milliseconds
+        let lastPipeTime = 0;
+        let bottles = [];
+        let bottleFrequency = 10000; // milliseconds
+        let lastBottleTime = 0;
+        let powerUpActive = false;
+        let powerUpEndTime = 0;
+        let animationFrameId;
+        
+        // Initialize game
+        function init() {
+            birdY = 300;
+            birdVelocity = 0;
+            score = 0;
+            scoreElement.textContent = score;
+            gameRunning = true;
+            gameOverElement.style.display = 'none';
+            powerUpActive = false;
+            powerUpTimer.style.display = 'none';
+            
+            // Clear existing pipes and bottles
+            pipes.forEach(pipe => {
+                if (pipe.element && pipe.element.parentNode) {
+                    pipe.element.parentNode.removeChild(pipe.element);
+                }
+            });
+            pipes = [];
+            
+            bottles.forEach(bottle => {
+                if (bottle.element && bottle.element.parentNode) {
+                    bottle.element.parentNode.removeChild(bottle.element);
+                }
+            });
+            bottles = [];
+            
+            // Reset bird position
+            bird.style.top = birdY + 'px';
+            bird.style.left = '100px';
+            bird.style.transform = 'rotate(0deg)';
+            
+            // Start game loop
+            lastPipeTime = performance.now();
+            lastBottleTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Game loop
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            
+            // Update bird
+            birdVelocity += gravity;
+            birdY += birdVelocity;
+            bird.style.top = birdY + 'px';
+            
+            // Rotate bird based on velocity
+            let rotation = birdVelocity * 2;
+            rotation = Math.max(-30, Math.min(30, rotation)); // Limit rotation
+            bird.style.transform = `rotate(${rotation}deg)`;
+            
+            // Check for collisions with ground or ceiling
+            if (birdY <= 0 || birdY + bird.offsetHeight >= gameContainer.offsetHeight - 30) {
+                gameOver();
+                return;
+            }
+            
+            // Generate pipes if no power-up active
+            if (!powerUpActive && timestamp - lastPipeTime > pipeFrequency) {
+                createPipe();
+                lastPipeTime = timestamp;
+            }
+            
+            // Generate bottles
+            if (timestamp - lastBottleTime > bottleFrequency) {
+                createBottle();
+                lastBottleTime = timestamp;
+            }
+            
+            // Update game elements
+            updatePipes();
+            updateBottles();
+            
+            // Update power-up timer if active
+            if (powerUpActive) {
+                const timeLeft = Math.ceil((powerUpEndTime - timestamp) / 1000);
+                powerUpTimer.textContent = `Power: ${timeLeft}s`;
+                if (timestamp >= powerUpEndTime) {
+                    endPowerUp();
+                }
+            }
+            
+            // Continue game loop
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Create a new pipe
+        function createPipe() {
+            const minHeight = 60;
+            const maxHeight = gameContainer.offsetHeight - pipeGap - minHeight - 30; // Subtract ground height
+            const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+            
+            // Top pipe
+            const topPipe = document.createElement('div');
+            topPipe.className = 'pipe';
+            topPipe.style.top = '0';
+            topPipe.style.left = gameContainer.offsetWidth + 'px';
+            topPipe.style.height = topHeight + 'px';
+            gameContainer.appendChild(topPipe);
+            
+            // Bottom pipe
+            const bottomPipe = document.createElement('div');
+            bottomPipe.className = 'pipe';
+            bottomPipe.style.top = (topHeight + pipeGap) + 'px';
+            bottomPipe.style.left = gameContainer.offsetWidth + 'px';
+            bottomPipe.style.height = (gameContainer.offsetHeight - topHeight - pipeGap - 30) + 'px'; // Subtract ground height
+            gameContainer.appendChild(bottomPipe);
+            
+            pipes.push({
+                element: topPipe,
+                x: gameContainer.offsetWidth,
+                height: topHeight,
+                top: true,
+                passed: false
+            });
+            
+            pipes.push({
+                element: bottomPipe,
+                x: gameContainer.offsetWidth,
+                height: gameContainer.offsetHeight - topHeight - pipeGap - 30,
+                top: false,
+                passed: false
+            });
+        }
+        
+        // Create a new bottle
+        function createBottle() {
+            const minHeight = 50;
+            const maxHeight = gameContainer.offsetHeight - 100;
+            const bottleY = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+            
+            const bottle = document.createElement('div');
+            bottle.className = 'bottle';
+            bottle.style.top = bottleY + 'px';
+            bottle.style.left = gameContainer.offsetWidth + 'px';
+            gameContainer.appendChild(bottle);
+            
+            bottles.push({
+                element: bottle,
+                x: gameContainer.offsetWidth,
+                y: bottleY,
+                collected: false
+            });
+        }
+        
+        // Update pipe positions and check for collisions
+        function updatePipes() {
+            for (let i = 0; i < pipes.length; i++) {
+                const pipe = pipes[i];
+                
+                // Only move pipes if no power-up active
+                if (!powerUpActive) {
+                    pipe.x -= 3;
+                    pipe.element.style.left = pipe.x + 'px';
+                }
+                
+                // Check for collision with bird
+                if (!powerUpActive) { // Only check collisions when power-up isn't active
+                    const birdLeft = 100;
+                    const birdRight = birdLeft + bird.offsetWidth;
+                    const birdTop = birdY;
+                    const birdBottom = birdY + bird.offsetHeight;
+                    
+                    const pipeLeft = pipe.x;
+                    const pipeRight = pipe.x + pipe.element.offsetWidth;
+                    const pipeTop = pipe.top ? 0 : parseInt(pipe.element.style.top);
+                    const pipeBottom = pipeTop + pipe.height;
+                    
+                    if (birdRight > pipeLeft && birdLeft < pipeRight && 
+                        birdBottom > pipeTop && birdTop < pipeBottom) {
+                        gameOver();
+                        return;
+                    }
+                }
+                
+                // Check if pipe passed the bird (for scoring)
+                if (!pipe.passed && pipe.x + pipe.element.offsetWidth < 100) {
+                    pipe.passed = true;
+                    if (pipe.top) {
+                        score++;
+                        scoreElement.textContent = score;
+                    }
+                }
+                
+                // Remove pipes that are off screen
+                if (pipe.x + pipe.element.offsetWidth < 0) {
+                    pipe.element.parentNode.removeChild(pipe.element);
+                    pipes.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+        
+        // Update bottle positions and check for collection
+        function updateBottles() {
+            for (let i = 0; i < bottles.length; i++) {
+                const bottle = bottles[i];
+                bottle.x -= 3;
+                bottle.element.style.left = bottle.x + 'px';
+                
+                // Check for collection by bird
+                const birdLeft = 100;
+                const birdRight = birdLeft + bird.offsetWidth;
+                const birdTop = birdY;
+                const birdBottom = birdY + bird.offsetHeight;
+                
+                const bottleLeft = bottle.x;
+                const bottleRight = bottle.x + bottle.element.offsetWidth;
+                const bottleTop = bottle.y;
+                const bottleBottom = bottle.y + bottle.element.offsetHeight;
+                
+                if (birdRight > bottleLeft && birdLeft < bottleRight && 
+                    birdBottom > bottleTop && birdTop < bottleBottom && !bottle.collected) {
+                    bottle.collected = true;
+                    bottle.element.parentNode.removeChild(bottle.element);
+                    bottles.splice(i, 1);
+                    i--;
+                    activatePowerUp();
+                    continue;
+                }
+                
+                // Remove bottles that are off screen
+                if (bottle.x + bottle.element.offsetWidth < 0) {
+                    bottle.element.parentNode.removeChild(bottle.element);
+                    bottles.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+        
+        // Activate power-up (make pipes disappear)
+        function activatePowerUp() {
+            powerUpActive = true;
+            powerUpEndTime = performance.now() + 5000; // 5 seconds
+            powerUpTimer.style.display = 'block';
+            powerUpTimer.textContent = 'Power: 5s';
+            
+            // Make all pipes semi-transparent
+            pipes.forEach(pipe => {
+                pipe.element.style.opacity = '0.5';
+            });
+        }
+        
+        // End power-up effect
+        function endPowerUp() {
+            powerUpActive = false;
+            powerUpTimer.style.display = 'none';
+            
+            // Restore pipe visibility
+            pipes.forEach(pipe => {
+                pipe.element.style.opacity = '1';
+            });
+        }
+        
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+            cancelAnimationFrame(animationFrameId);
+            
+            // Make bird fall and rotate
+            bird.style.transform = 'rotate(90deg)';
+        }
+        
+        // Jump when spacebar or mouse click
+        function jump() {
+            if (gameRunning) {
+                birdVelocity = jumpForce;
+            } else if (gameOverElement.style.display === 'block') {
+                init(); // Restart game if clicked when game over
+            }
+        }
+        
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                jump();
+            }
+        });
+        
+        gameContainer.addEventListener('click', jump);
+        
+        restartBtn.addEventListener('click', init);
+        
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
